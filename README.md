@@ -10,4 +10,4 @@
 
 ## About The Project
 
-Kestrel is a passion project born from an interest in building lightweight, custom search engines[2]. I wanted to apply those principles to one of the most fascinating search problems: the game of chess...
+Kestrel is a passion project born from an interest in building lightweight, custom search engines. I wanted to apply those principles to one of the most fascinating search problems: the game of chess.

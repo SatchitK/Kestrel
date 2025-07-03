@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="github-assets/kestrel_logo.png" alt="Kestrel Engine Logo" width="350"/>
+</div>
+
 # Kestrel 🦅
 
 > A lightweight Python chess engine applying modern AI search principles to an ancient game.

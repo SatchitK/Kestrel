@@ -1,5 +1,6 @@
 import tkinter as tk
 import chess
+import pathlib
 from gui.gui_constants import NUM_SQ as SQ, LIGHT_SQ_COLOR as LIGHT, DARK_SQ_COLOR as DARK, WHITE_BOTTOM as white_bottom
 from gui.gui_helpers import sq2xy
 
@@ -14,6 +15,10 @@ canvas.pack()
 
 board = chess.Board()
 
+PIECES_IMG_DIR = pathlib.Path(__file__).parent / "images"
+piece_names = PIECES_IMG_DIR.glob("*.png")
+IMG = {p.stem: tk.PhotoImage(file=p) for p in piece_names}
+
 def draw():
     canvas.delete("all")
     for r in range(8):
@@ -26,12 +31,8 @@ def draw():
         piece = board.piece_at(sq)
         if piece:
             x, y = sq2xy(sq)
-            if piece.color:
-                fill_color = "black" if piece.color else "white"
-            piece_x_coord = x + SQ // 2
-            piece_y_coord = y + SQ // 2
-            font_characteristics = ("Arial", 24)
-            canvas.create_text(piece_x_coord, piece_y_coord, text=piece.symbol(), font=font_characteristics, fill=fill_color)
+            key = ('w' if piece.color else 'b') + piece.symbol().upper()
+            canvas.create_image(x, y, anchor="nw", image=IMG[key])
 
 def previous_move():
     if board.move_stack:

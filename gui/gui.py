@@ -22,6 +22,8 @@ IMG = {p.stem: tk.PhotoImage(file=p) for p in piece_names}
 drag_item = None
 from_sq = None
 avail_sqs = set()
+last_move = None
+is_dragging = False
 
 def draw():
     canvas.delete("all")
@@ -31,15 +33,30 @@ def draw():
             x = c*SQ if white_bottom else (7-c)*SQ
             y = r*SQ if white_bottom else (7-r)*SQ
             canvas.create_rectangle(x, y, x+SQ, y+SQ, fill=color, width=0)
+    if last_move:
+        for sq in [last_move.from_square, last_move.to_square]:
+            x, y = sq2xy(sq)
+            canvas.create_rectangle(x, y, x+SQ, y+SQ, fill="#f6f669", stipple="gray50")
+    if board.is_check():
+        king_square = board.king(board.turn)
+        if king_square is not None:
+            x, y = sq2xy(king_square)
+            canvas.create_rectangle(x, y, x+SQ, y+SQ, fill="#ff4d4d", stipple="gray50")
     for sq in chess.SQUARES:
         piece = board.piece_at(sq)
         if piece:
             x, y = sq2xy(sq)
             key = ('w' if piece.color else 'b') + piece.symbol().upper()
             canvas.create_image(x, y, anchor="nw", image=IMG[key], tags=f"sq{sq}")
+    for sq in avail_sqs:
+        x, y = sq2xy(sq)
+        cx, cy = x + SQ//2, y + SQ//2
+        rdot = SQ // 6
+        canvas.create_oval(cx-rdot, cy-rdot, cx+rdot, cy+rdot, fill="#4da6ff", outline="")
 
 def start_drag(event):
-    global drag_item, from_sq, avail_sqs
+    global drag_item, from_sq, avail_sqs, is_dragging
+    is_dragging = True
     if board.is_game_over():
         return
     sq = xy2sq(event.x, event.y)
@@ -57,24 +74,53 @@ def start_drag(event):
         canvas.tag_raise(drag_item)
 
 def drag(event):
+    global is_dragging
     if drag_item:
         canvas.coords(drag_item, event.x-SQ//2, event.y-SQ//2)
 
 def end_drag(event):
-    global drag_item, from_sq, avail_sqs
+    global drag_item, from_sq, avail_sqs, last_move, is_dragging
+    if not is_dragging:
+        click_move(event)
+        return
     if drag_item is None:
         return
     to_sq = xy2sq(event.x, event.y)
     if to_sq is not None and to_sq in avail_sqs:
         move = chess.Move(from_sq, to_sq)
         board.push(move)
+        last_move = move
     drag_item = None
     from_sq = None
     avail_sqs = set()
+    is_dragging = False
     draw()
 
+def click_move(event):
+    global from_sq, avail_sqs, last_move
+    sq = xy2sq(event.x, event.y)
+    if sq is None:
+        return
+    if from_sq is None:
+        piece = board.piece_at(sq)
+        if piece is None or piece.color != board.turn:
+            return
+        from_sq = sq
+        avail_sqs = {move.to_square for move in board.legal_moves if move.from_square == sq}
+        draw()
+    else:
+        if sq in avail_sqs:
+            move = chess.Move(from_sq, sq)
+            board.push(move)
+            last_move = move
+        from_sq = None
+        avail_sqs = set()
+        draw()
+
 def previous_move():
+    global last_move
     if board.move_stack:
+        last_move = board.move_stack[-1]
         board.pop()
         draw()
 

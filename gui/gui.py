@@ -7,7 +7,7 @@ from gui.gui_helpers import sq2xy
 root = tk.Tk()
 root.title("Kestrel")
 
-logo = tk.PhotoImage(file="github-assets/kestrel_icon_logo.png")
+logo = tk.PhotoImage(file="assets/kestrel_icon_logo.png")
 root.iconphoto(True, logo)
 
 canvas = tk.Canvas(root, width=8*SQ, height=8*SQ)

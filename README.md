@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="assets/kestrel_logo.png" alt="Kestrel Engine Logo" width="350"/> 
+  <img src="assets/kestrel_logo.png" alt="Kestrel Engine Logo" width="350"/>  
 </div>
 
 # Kestrel 🦅

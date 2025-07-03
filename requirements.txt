@@ -1,5 +1,7 @@
 python-chess
-torch torchvision torchaudio
+torch
+torchvision
+torchaudio
 numpy
 tqdm
 pillow

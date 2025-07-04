@@ -24,7 +24,6 @@ from_sq = None
 avail_sqs = set()
 last_move = None
 is_dragging = False
-undone_moves = []
 
 def draw():
     canvas.delete("all")
@@ -119,19 +118,10 @@ def click_move(event):
         draw()
 
 def previous_move():
-    global last_move, undone_moves
+    global last_move
     if board.move_stack:
-        move = board.pop()
-        undone_moves.append(move)
-        last_move = None
-        draw()
-
-def next_move():
-    global last_move, undone_moves
-    if undone_moves:
-        move = undone_moves.pop()
-        board.push(move)
-        last_move = move
+        last_move = board.move_stack[-1]
+        board.pop()
         draw()
 
 canvas.bind("<Button-1>", start_drag)
@@ -141,10 +131,6 @@ canvas.bind("<ButtonRelease-1>", end_drag)
 nav_frame = tk.Frame(root)
 nav_frame.pack()
 tk.Button(nav_frame, text="Previous Move", command=previous_move).pack(side=tk.LEFT)
-tk.Button(nav_frame, text="Next Move", command=next_move).pack(side=tk.LEFT)
-
-root.bind("<Left>", lambda event: previous_move())
-root.bind("<Right>", lambda event: next_move())
 
 draw()
 root.mainloop()

@@ -13,16 +13,20 @@ _piece_idx = {
     chess.KING:   5,
 }
 
-def board_to_tensor(board):
-    planes = torch.zeros(12, 8, 8, dtype=torch.float32)
-    for sq in chess.SQUARES:
-        piece = board.piece_at(sq)
-        if piece is None:
-            continue
-        plane = _piece_idx[piece.piece_type] + (0 if piece.color else 6)
-        r, f = divmod(sq, 8)
-        planes[plane, 7 - r, f] = 1
-    return planes
+import torch
+import chess
+
+def board_to_tensor(board: chess.Board):
+    tensor = torch.zeros(12, 8, 8, dtype=torch.float32)
+    piece_map = board.piece_map()
+    for square, piece in piece_map.items():
+        piece_type = piece.piece_type - 1
+        color_offset = 0 if piece.color == chess.WHITE else 6
+        row = chess.square_rank(square)
+        col = chess.square_file(square)
+        tensor[piece_type + color_offset, row, col] = 1
+    return tensor
+
 
 # material weights for supervised training
 _WEIGHTS = torch.tensor([

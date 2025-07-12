@@ -22,7 +22,35 @@ Make sure you have the following installed on your system:
 *   **Python 3.8+**
 *   **Git**
 
-### Installation & Setup
+
+### Installation & Setup - NEW
+
+1.  **Clone the Repository**
+
+    Open your terminal and clone the repository to your local machine.
+
+    ```
+    git clone https://github.com/SatchitK/Kestrel.git
+    ```
+
+2.  **Navigate to the Project Directory**
+
+    Move into the newly created folder:
+    ```
+    cd Kestrel
+    ```
+
+3.  **Navigate to the dist Directory**
+
+    Move into the newly created folder:
+    ```
+    cd dist
+    ```
+    
+4.  **Run ```gui.exe```**
+
+    
+### Installation & Setup - OLD
 
 1.  **Clone the Repository**
 

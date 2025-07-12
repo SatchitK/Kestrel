@@ -1,8 +1,3 @@
-"""
-Very small Polyglot reader. Supply an opening book file 'book.bin'
-(e.g. tiny book from polyglot or another engine). If no book found
-`lookup()` returns None and search is used instead.
-"""
 import struct, os, random, chess
 from .transposition import zobrist_hash
 
@@ -15,7 +10,6 @@ class Book:
             for i in range(0, len(data), 16):
                 key, move, weight, learn = struct.unpack(">QHHI", data[i:i+16])
                 self.entries.append((key, move, weight))
-        # otherwise empty
 
     def lookup(self, board: chess.Board):
         if not self.entries:
@@ -33,7 +27,6 @@ class Book:
                 return chess.Move.from_uci(polyglot_move_to_uci(move16))
         return None
 
-# polyglot move unpack
 def polyglot_move_to_uci(move16):
     from_sq = (move16 >> 6) & 0x3F
     to_sq   = move16 & 0x3F

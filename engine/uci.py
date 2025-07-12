@@ -1,7 +1,3 @@
-"""
-UCI protocol wrapper so you can test in Arena / cutechess-cli.
-Run:  python -m engine.uci
-"""
 import sys, chess, threading, time
 from .search import find_best_move
 

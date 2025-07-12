@@ -6,19 +6,14 @@ import random
 INF = 10_000
 MAX_PLY = 64
 
-# killer moves & history heuristic
 KILLERS = [[None, None] for _ in range(MAX_PLY)]
 HISTORY = {}
 
 def find_best_move(board: chess.Board, time_limit: float = 2.0):
-    """
-    Iterative-deepening root. Returns the best chess.Move found
-    within `time_limit` seconds (wall-clock). Never raises TimeoutError.
-    """
     best_move = None
     depth     = 1
     t_start   = time.time()
-    aspiration = 30     # ± window in centipawns
+    aspiration = 30
     score = 0
 
     while True:
@@ -29,16 +24,15 @@ def find_best_move(board: chess.Board, time_limit: float = 2.0):
                 score, move = alphabeta(board, depth, alpha, beta,
                                         0, t_start, time_limit)
             except TimeoutError:
-                # Clock expired inside the search – return current best
                 return best_move or random.choice(list(board.legal_moves))
 
-            if score <= alpha:           # fail-low, widen window
+            if score <= alpha:
                 alpha -= aspiration
                 continue
-            if score >= beta:            # fail-high
+            if score >= beta:
                 beta += aspiration
                 continue
-            break                        # score inside window
+            break
 
         if move:
             best_move = move
@@ -47,13 +41,7 @@ def find_best_move(board: chess.Board, time_limit: float = 2.0):
         if time.time() - t_start > time_limit or depth > MAX_PLY:
             return best_move
 
-
-# ───────────────────────────────────────────────────────────────
 def alphabeta(board, depth, alpha, beta, ply, t_start, time_limit):
-    """
-    Negamax α-β with TT, LMR, quiescence, killers, history & iterative deepening queue.
-    Returns (score, best_move) from perspective of side to move.
-    """
     if board.is_checkmate():
         return (-INF + ply, None)
     if board.is_stalemate() or board.is_insufficient_material():
@@ -61,7 +49,6 @@ def alphabeta(board, depth, alpha, beta, ply, t_start, time_limit):
     if depth == 0:
         return (quiescence(board, alpha, beta, ply), None)
 
-    # time check
     if time.time() - t_start > time_limit:
         raise TimeoutError
 
@@ -79,7 +66,6 @@ def alphabeta(board, depth, alpha, beta, ply, t_start, time_limit):
 
     best_move = None
     legal_moves = list(board.legal_moves)
-    # move ordering ▸ 1) TT move  2) captures MVV/LVA  3) killers  4) history
     if tt and tt.move in legal_moves:
         legal_moves.remove(tt.move)
         legal_moves.insert(0, tt.move)
@@ -87,7 +73,6 @@ def alphabeta(board, depth, alpha, beta, ply, t_start, time_limit):
     legal_moves.sort(key=lambda m: move_score(board, m, ply), reverse=True)
 
     for idx, move in enumerate(legal_moves):
-        # Late Move Reduction
         new_depth = depth - 1
         if idx >= 4 and depth >= 3 and not board.is_check():
             new_depth -= 1
@@ -103,7 +88,6 @@ def alphabeta(board, depth, alpha, beta, ply, t_start, time_limit):
         board.pop()
 
         if score >= beta:
-            # beta cutoff ▸ store killer / history
             if move not in KILLERS[ply]:
                 KILLERS[ply][1] = KILLERS[ply][0]
                 KILLERS[ply][0] = move
@@ -117,7 +101,6 @@ def alphabeta(board, depth, alpha, beta, ply, t_start, time_limit):
     store(hash_key, depth, alpha, flag, best_move)
     return (alpha, best_move)
 
-# ───────────────────────────────────────────────────────────────
 def quiescence(board, alpha, beta, ply):
     stand_pat = evaluate(board)
     if stand_pat >= beta:
@@ -137,16 +120,9 @@ def quiescence(board, alpha, beta, ply):
             alpha = score
     return alpha
 
-# ───────────────────────────────────────────────────────────────
 def move_score(board, move, ply):
-    """
-    MVV/LVA + killer + history ordering.
-    Returns a numeric key used for sorting; higher = searched first.
-    """
-    # 1. Captures ▸ MVV/LVA
     if board.is_capture(move):
         victim_piece = board.piece_at(move.to_square)
-        # en-passant: victim is on a different square
         if victim_piece is None and board.is_en_passant(move):
             ep_sq = move.to_square + (-8 if board.turn else 8)
             victim_piece = board.piece_at(ep_sq)
@@ -155,10 +131,8 @@ def move_score(board, move, ply):
         attacker_val = board.piece_at(move.from_square).piece_type
         return 10_000 + 10 * victim_val - attacker_val
 
-    # 2. Killer moves
     if move in KILLERS[ply]:
         return 9_000
 
-    # 3. History heuristic
     return HISTORY.get(move, 0)
 

@@ -6,6 +6,8 @@ import engine                               # ← NEW
 from gui.gui_constants import NUM_SQ as SQ, LIGHT_SQ_COLOR as LIGHT, \
                               DARK_SQ_COLOR as DARK, WHITE_BOTTOM as white_bottom
 from gui.gui_helpers import sq2xy, xy2sq
+import gui.gui_helpers as helpers      # <— NEW
+
 
 # ──────────────────────────────────────────
 # basic window setup
@@ -19,8 +21,17 @@ canvas.pack()
 
 board = chess.Board()
 
+import threading
+
+engine_thinking = False
+
+OVERLAY_BG = "#000000"      # black, 50 % stipple
+OVERLAY_FG = "#ffeb3b"      # bright yellow text
+
 PIECES_IMG_DIR = pathlib.Path(__file__).parent / "images"
 IMG = {p.stem: tk.PhotoImage(file=p) for p in PIECES_IMG_DIR.glob("*.png")}
+# human starts with the side that is at the bottom
+human_color = chess.WHITE if white_bottom else chess.BLACK
 
 drag_item   = None
 from_sq     = None
@@ -75,6 +86,18 @@ def draw():
 
     update_status()
 
+    if board.is_checkmate():
+        # darken everything below
+        canvas.create_rectangle(0, 0, 8*SQ, 8*SQ,
+                                fill=OVERLAY_BG, stipple="gray50", width=0)
+        # winner text
+        winner = "White" if board.turn == chess.BLACK else "Black"
+        canvas.create_text(4*SQ, 4*SQ,
+                           text=f"{winner} wins by CHECKMATE",
+                           fill=OVERLAY_FG,
+                           font=("Helvetica", SQ//4, "bold"),
+                           anchor="c")
+
 def update_status():
     if board.is_checkmate():
         winner = "White" if board.turn == chess.BLACK else "Black"
@@ -91,21 +114,36 @@ def update_status():
 
 # ──────────────────────────────────────────
 def make_ai_move():
-    """Call classic engine and push its reply."""
-    global last_move, undone_moves
-    if board.is_game_over():
+    """Start a background thread; GUI stays responsive."""
+    global engine_thinking
+    if board.is_game_over() or board.turn == human_color or engine_thinking:
         return
-    ai_move = engine.best_move(board, time_limit=2.0)
-    if ai_move:
-        board.push(ai_move)
-        last_move = ai_move
-        undone_moves = []             # clear redo stack
+
+    position = board.copy()         # thread-safe snapshot
+    engine_thinking = True
+
+    def worker():
+        move = engine.best_move(position, time_limit=2.0)
+
+        def apply():
+            global last_move, engine_thinking, undone_moves
+            if move and not board.is_game_over() and board.turn != human_color:
+                board.push(move)
+                last_move = move
+                undone_moves.clear()
+                draw()
+            engine_thinking = False
+
+        root.after(0, apply)        # back to GUI thread
+
+    threading.Thread(target=worker, daemon=True).start()
+
 
 # ──────────────────────────────────────────
 # mouse handlers
 def start_drag(event):
     global drag_item, from_sq, avail_sqs, is_dragging
-    if board.is_game_over():
+    if board.is_game_over() or board.turn != human_color:
         return
     is_dragging = True
     sq = xy2sq(event.x, event.y)
@@ -140,6 +178,7 @@ def end_drag(event):
             board.push(move)
             last_move = move
             # engine reply
+            draw()
             make_ai_move()
     drag_item = None
     from_sq  = None
@@ -149,7 +188,7 @@ def end_drag(event):
 
 def click_move(event):
     global from_sq, avail_sqs, last_move
-    if board.is_game_over():
+    if board.is_game_over() or board.turn != human_color:
         return
     sq = xy2sq(event.x, event.y)
     if sq is None:
@@ -170,6 +209,7 @@ def click_move(event):
                 board.push(move)
                 last_move = move
                 # engine reply
+                draw()
                 make_ai_move()
         from_sq = None
         avail_sqs.clear()
@@ -194,18 +234,27 @@ def next_move():
         draw()
 
 def new_game():
-    global board, last_move, undone_moves, from_sq, avail_sqs
+    global board, last_move, undone_moves, from_sq, avail_sqs, human_color
     board = chess.Board()
-    last_move = None
+    human_color = chess.WHITE if white_bottom else chess.BLACK
+    last_move = from_sq = None
     undone_moves = []
-    from_sq = None
     avail_sqs.clear()
     draw()
 
+
 def flip_board():
-    global white_bottom
+    global white_bottom, human_color            # human_color already exists
     white_bottom = not white_bottom
+    helpers.white_bottom = white_bottom         # keep helpers in sync
+
+    if not board.move_stack:                    # no moves played yet
+        human_color = chess.WHITE if white_bottom else chess.BLACK
+        if board.turn != human_color:           # AI now starts
+            make_ai_move()
+
     draw()
+
 
 # ──────────────────────────────────────────
 # event bindings

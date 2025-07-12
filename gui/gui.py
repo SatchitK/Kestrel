@@ -9,11 +9,27 @@ from gui.gui_helpers import sq2xy, xy2sq
 import gui.gui_helpers as helpers      # <— NEW
 
 
+import sys, os, pathlib
+
+def resource_path(relative: str) -> str:
+    """
+    Return absolute path to a resource, whether the app is frozen
+    or running in the source tree.
+    """
+    base = getattr(sys, "_MEIPASS", pathlib.Path(__file__).resolve().parent.parent)
+    return os.path.join(base, relative)
+
+
 # ──────────────────────────────────────────
 # basic window setup
 root = tk.Tk()
 root.title("Kestrel")
-logo = tk.PhotoImage(file="assets/kestrel_icon_logo.png")
+logo = tk.PhotoImage(file=resource_path("assets/kestrel_icon_logo.png"))
+
+PIECES_IMG_DIR = pathlib.Path(resource_path("gui/images"))
+IMG = {p.stem: tk.PhotoImage(file=resource_path(str(p)))
+       for p in PIECES_IMG_DIR.glob("*.png")}
+
 root.iconphoto(True, logo)
 
 canvas = tk.Canvas(root, width=8*SQ, height=8*SQ)
@@ -28,8 +44,8 @@ engine_thinking = False
 OVERLAY_BG = "#000000"      # black, 50 % stipple
 OVERLAY_FG = "#ffeb3b"      # bright yellow text
 
-PIECES_IMG_DIR = pathlib.Path(__file__).parent / "images"
-IMG = {p.stem: tk.PhotoImage(file=p) for p in PIECES_IMG_DIR.glob("*.png")}
+# PIECES_IMG_DIR = pathlib.Path(__file__).parent / "images"
+# IMG = {p.stem: tk.PhotoImage(file=p) for p in PIECES_IMG_DIR.glob("*.png")}
 # human starts with the side that is at the bottom
 human_color = chess.WHITE if white_bottom else chess.BLACK
 

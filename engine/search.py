@@ -120,6 +120,7 @@ def quiescence(board, alpha, beta, ply):
             alpha = score
     return alpha
 
+
 def move_score(board, move, ply):
     if board.is_capture(move):
         victim_piece = board.piece_at(move.to_square)

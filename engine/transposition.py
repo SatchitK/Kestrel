@@ -23,6 +23,24 @@ def zobrist_hash(board: chess.Board):
         h ^= Z_EP[chess.square_file(board.ep_square)]
     return h
 
+def polyglot_hash(board: chess.Board) -> int:
+        h = 0
+        for sq, piece in board.piece_map().items():
+            piece_idx = piece.piece_type - 1 + (0 if piece.color == chess.WHITE else 6)
+            h ^= Z_KEYS[sq][piece_idx]
+        if board.turn == chess.BLACK:
+            h ^= Z_BLACK
+        rights = (
+            (1 if board.has_kingside_castling_rights(chess.WHITE) else 0) |
+            (2 if board.has_queenside_castling_rights(chess.WHITE) else 0) |
+            (4 if board.has_kingside_castling_rights(chess.BLACK) else 0) |
+            (8 if board.has_queenside_castling_rights(chess.BLACK) else 0)
+        )
+        h ^= Z_CASTLING[rights]
+        if board.ep_square is not None:
+            h ^= Z_EP[chess.square_file(board.ep_square)]
+        return h
+
 TT_SIZE = 1 << 20
 TT_MASK = TT_SIZE - 1
 

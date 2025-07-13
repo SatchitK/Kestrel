@@ -1,5 +1,5 @@
 import struct, os, random, chess
-from .transposition import zobrist_hash, polyglot_hash
+from .transposition import zobrist_hash
 import chess.polyglot
 
 class Book:

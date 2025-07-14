@@ -120,7 +120,6 @@ def quiescence(board, alpha, beta, ply):
             alpha = score
     return alpha
 
-
 def move_score(board, move, ply):
     if board.is_capture(move):
         victim_piece = board.piece_at(move.to_square)
@@ -136,4 +135,3 @@ def move_score(board, move, ply):
         return 9_000
 
     return HISTORY.get(move, 0)
-

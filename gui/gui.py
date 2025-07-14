@@ -447,30 +447,28 @@ def draw():
 #  Promotion dialog
 # ─────────────────────────────────────────────────────────────
 def choose_promotion() -> int | None:
-    """Returns the chosen piece type or None if dialog was closed."""
     win = tk.Toplevel(root)
     win.title("Choose Promotion")
     win.geometry("220x100")
-    win.grab_set()  # modal
-
-    choice = tk.IntVar(value=chess.QUEEN)  # default
+    win.grab_set()                           # modal
+    choice = tk.IntVar(value=chess.QUEEN)    # default
 
     def set_choice(pt):
         choice.set(pt)
-        win.destroy()
+        win.destroy()                        # close dialog
 
     tk.Label(win, text="Promote to:").pack(pady=5)
-
-    for text, pt in (("Queen", chess.QUEEN),
-                     ("Rook",  chess.ROOK),
+    for text, pt in (("Queen",  chess.QUEEN),
+                     ("Rook",   chess.ROOK),
                      ("Bishop", chess.BISHOP),
                      ("Knight", chess.KNIGHT)):
         tk.Button(win, text=text,
                   command=lambda pt=pt: set_choice(pt)
-                  ).pack(side=tk.LEFT, padx=5)
+        ).pack(side=tk.LEFT, padx=5)
 
-    win.wait_window()
+    win.wait_window()                        # block until closed
     return choice.get() if choice.get() else None
+
 
 # ─────────────────────────────────────────────────────────────
 #  Status bar
@@ -543,38 +541,79 @@ def drag(event):
     if drag_item:
         canvas.coords(drag_item, event.x - SQ // 2, event.y - SQ // 2)
 
+# ─────────────────────────────────────────────────────────────
+#   Drag-and-drop finish
+# ─────────────────────────────────────────────────────────────
 def end_drag(event):
+    """
+    Finalise a drag-and-drop operation.
+
+    1.  Look at every legal move that starts on from_sq and ends on to_sq.
+    2.  If none exist, the piece snaps back.
+    3.  If promotion is required, ask the user which piece to choose.
+    4.  Push the chosen move, redraw, and let the engine reply.
+    """
     global drag_item, from_sq, avail_sqs, last_move, is_dragging
+
     if not is_dragging:
-        click_move(event)
+        click_move(event)            # treat as simple click
         return
     if drag_item is None:
-        return
+        return                       # nothing was being dragged
 
     to_sq = xy2sq(event.x, event.y)
-    if to_sq in avail_sqs:
-        mv = chess.Move(from_sq, to_sq)
-        if mv in board.legal_moves:
-            # Promotion check
-            if (board.piece_at(from_sq).piece_type == chess.PAWN
-                    and chess.square_rank(to_sq) in (0, 7)):
-                pt = choose_promotion()
-                if pt is None:
-                    pt = chess.QUEEN           # auto-queen fallback
-                mv.promotion = pt
-            board.push(mv)
-            last_move = mv
-            draw()
-            make_ai_move()
+    if to_sq not in avail_sqs:        # illegal destination → snap back
+        drag_item = None
+        is_dragging = False
+        draw()
+        return
 
+    # gather all legal moves with the requested from/to squares
+    candidate_moves = [
+        m for m in board.legal_moves
+        if m.from_square == from_sq and m.to_square == to_sq
+    ]
+    if not candidate_moves:           # should never happen
+        drag_item = None
+        is_dragging = False
+        draw()
+        return
+
+    # pick promotion piece when needed
+    pt = None
+    if (board.piece_at(from_sq).piece_type == chess.PAWN and
+            chess.square_rank(to_sq) in (0, 7)):
+        pt = choose_promotion() or chess.QUEEN
+
+    # choose the move that matches the promotion piece (or has none)
+    mv = next(
+        m for m in candidate_moves
+        if m.promotion == (pt or None)
+    )
+
+    board.push(mv)
+    last_move = mv
     drag_item = None
     from_sq = None
     avail_sqs.clear()
     is_dragging = False
-    draw()
 
+    draw()
+    make_ai_move()
+
+
+# ─────────────────────────────────────────────────────────────
+#   Click-to-move (two–tap) input
+# ─────────────────────────────────────────────────────────────
 def click_move(event):
+    """
+    Two-click move entry.
+
+    1st click: select a piece  
+    2nd click: attempt a move to the chosen square (promotion-aware)
+    """
     global from_sq, avail_sqs, last_move
+
     if board.is_game_over() or board.turn != human_color:
         return
 
@@ -582,7 +621,7 @@ def click_move(event):
     if sq is None:
         return
 
-    # first click – select piece
+    # first click ─ select piece
     if from_sq is None:
         piece = board.piece_at(sq)
         if piece is None or piece.color != board.turn:
@@ -593,27 +632,42 @@ def click_move(event):
         draw()
         return
 
-    # second click – attempt move
-    if sq in avail_sqs:
-        mv = chess.Move(from_sq, sq)
+    # second click ─ attempt move
+    if sq not in avail_sqs:
+        # clicked an illegal target: reset selection
+        from_sq = None
+        avail_sqs.clear()
+        draw()
+        return
 
-        # Promotion handling for click-to-move
-        if (board.piece_at(from_sq).piece_type == chess.PAWN
-                and chess.square_rank(sq) in (0, 7)):
-            pt = choose_promotion()
-            if pt is None:
-                pt = chess.QUEEN               # default to queen
-            mv.promotion = pt
+    candidate_moves = [
+        m for m in board.legal_moves
+        if m.from_square == from_sq and m.to_square == sq
+    ]
+    if not candidate_moves:
+        from_sq = None
+        avail_sqs.clear()
+        draw()
+        return
 
-        if mv in board.legal_moves:
-            board.push(mv)
-            last_move = mv
-            draw()
-            make_ai_move()
+    pt = None
+    if (board.piece_at(from_sq).piece_type == chess.PAWN and
+            chess.square_rank(sq) in (0, 7)):
+        pt = choose_promotion() or chess.QUEEN
 
+    mv = next(
+        m for m in candidate_moves
+        if m.promotion == (pt or None)
+    )
+
+    board.push(mv)
+    last_move = mv
     from_sq = None
     avail_sqs.clear()
+
     draw()
+    make_ai_move()
+
 
 # ─────────────────────────────────────────────────────────────
 #  Navigation & utility buttons

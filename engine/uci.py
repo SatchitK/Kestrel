@@ -7,9 +7,9 @@ class UciEngine:
         while True:
             cmd = sys.stdin.readline().strip()
             if cmd == "uci":
-                print("id name Kestrel-Engine")
-                print("id author You")
-                print("uciok")
+                print("id name Kestrel-Engine", flush=True)     # ← add flush
+                print("id author You", flush=True)               # ← add flush
+                print("uciok", flush=True)                       # ← add flush
             elif cmd.startswith("position"):
                 if "startpos" in cmd:
                     board = chess.Board()
@@ -25,9 +25,9 @@ class UciEngine:
                 if "movetime" in cmd:
                     tl = int(cmd.split("movetime")[1]) / 1000.0
                 move = find_best_move(board, tl)
-                print(f"bestmove {move.uci()}")
+                print(f"bestmove {move.uci()}", flush=True)
             elif cmd == "isready":
-                print("readyok")
+                print("readyok", flush=True)
             elif cmd == "quit":
                 break
 

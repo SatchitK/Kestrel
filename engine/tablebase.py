@@ -23,7 +23,7 @@ def in_tb(b: chess.Board) -> bool:
 def tb_wdl(b: chess.Board) -> int | None:
     """
     Syzygy WDL score from the *side-to-move* view:
-    +2  win,  +1  draw+,  0  draw  –1  draw–,  –2  loss
+    +2 win, +1 draw+, 0 draw –1 draw–, –2 loss
     Returns None when the position is not in TB.
     """
     if not in_tb(b):
@@ -43,10 +43,10 @@ def tb_centi(b: chess.Board) -> int | None:
     wdl = tb_wdl(b)
     if wdl is None:
         return None
-    return {+2:  32000,
-            +1:   1000,
-             0:      0,
-            -1:  -1000,
+    return {+2: 32000,
+            +1: 1000,
+            0: 0,
+            -1: -1000,
             -2: -32000}[wdl]
 
 def tb_best(b: chess.Board):

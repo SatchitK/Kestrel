@@ -1,182 +1,203 @@
 import chess
 
+# --- Piece Values ---
+INF = 100000  # Added INF for checkmate evaluation
 VAL = {
     chess.PAWN: 100,
     chess.KNIGHT: 320,
     chess.BISHOP: 330,
     chess.ROOK: 500,
     chess.QUEEN: 900,
-    chess.KING: 0
+    chess.KING: 20000  # King value is high for checkmate detection in search
 }
 
+# --- Piece-Square Tables (PSTs) ---
 PST = {
     chess.PAWN: [
-        0, 5, 5, -5, -5, 10, 50, 0,
-        0, 10, -5, 0, 0, 10, 50, 0,
-        0, 10, -10, 20, 25, 30, 50, 0,
-        0, -20, 0, 0, 25, 30, 50, 0,
-        0, 10, -5, 0, 25, 30, 50, 0,
-        0, 10, -5, 0, 0, 10, 50, 0,
-        0, 10, -10, -5, -5, 10, 50, 0,
-        0, 5, 5, -5, -5, 10, 50, 0
+        0,  0,  0,  0,  0,  0,  0,  0,
+        50, 50, 50, 50, 50, 50, 50, 50,
+        10, 10, 20, 30, 30, 20, 10, 10,
+         5,  5, 10, 25, 25, 10,  5,  5,
+         0,  0,  0, 20, 20,  0,  0,  0,
+         5, -5,-10,  0,  0,-10, -5,  5,
+         5, 10, 10,-20,-20, 10, 10,  5,
+         0,  0,  0,  0,  0,  0,  0,  0
     ],
     chess.KNIGHT: [
-        -50, -40, -30, -30, -30, -30, -40, -50,
-        -40, -20, 0, 0, 0, 0, -20, -40,
-        -30, 0, 10, 15, 15, 10, 0, -30,
-        -30, 5, 15, 20, 20, 15, 5, -30,
-        -30, 0, 15, 20, 20, 15, 0, -30,
-        -30, 5, 10, 15, 15, 10, 5, -30,
-        -40, -20, 0, 5, 5, 0, -20, -40,
-        -50, -40, -30, -30, -30, -30, -40, -50
+        -50,-40,-30,-30,-30,-30,-40,-50,
+        -40,-20,  0,  0,  0,  0,-20,-40,
+        -30,  0, 10, 15, 15, 10,  0,-30,
+        -30,  5, 15, 20, 20, 15,  5,-30,
+        -30,  0, 15, 20, 20, 15,  0,-30,
+        -30,  5, 10, 15, 15, 10,  5,-30,
+        -40,-20,  0,  5,  5,  0,-20,-40,
+        -50,-40,-30,-30,-30,-30,-40,-50
     ],
     chess.BISHOP: [
-        -20, -10, -10, -10, -10, -10, -10, -20,
-        -10, 5, 0, 0, 0, 0, 5, -10,
-        -10, 10, 10, 10, 10, 10, 10, -10,
-        -10, 0, 10, 10, 10, 10, 0, -10,
-        -10, 5, 5, 10, 10, 5, 5, -10,
-        -10, 0, 5, 10, 10, 5, 0, -10,
-        -10, 0, 0, 0, 0, 0, 0, -10,
-        -20, -10, -10, -10, -10, -10, -10, -20
+        -20,-10,-10,-10,-10,-10,-10,-20,
+        -10,  0,  0,  0,  0,  0,  0,-10,
+        -10,  0,  5, 10, 10,  5,  0,-10,
+        -10,  5,  5, 10, 10,  5,  5,-10,
+        -10,  0, 10, 10, 10, 10,  0,-10,
+        -10, 10, 10, 10, 10, 10, 10,-10,
+        -10,  5,  0,  0,  0,  0,  5,-10,
+        -20,-10,-10,-10,-10,-10,-10,-20
     ],
     chess.ROOK: [
-        0, 0, 5, 10, 10, 5, 0, 0,
-        0, 0, 5, 10, 10, 5, 0, 0,
-        0, 0, 5, 10, 10, 5, 0, 0,
-        0, 0, 5, 10, 10, 5, 0, 0,
-        0, 0, 5, 10, 10, 5, 0, 0,
-        0, 0, 5, 10, 10, 5, 0, 0,
-        25, 25, 25, 25, 25, 25, 25, 25,
-        0, 0, 5, 10, 10, 5, 0, 0
+          0,  0,  0,  0,  0,  0,  0,  0,
+          5, 10, 10, 10, 10, 10, 10,  5,
+         -5,  0,  0,  0,  0,  0,  0, -5,
+         -5,  0,  0,  0,  0,  0,  0, -5,
+         -5,  0,  0,  0,  0,  0,  0, -5,
+         -5,  0,  0,  0,  0,  0,  0, -5,
+         -5,  0,  0,  0,  0,  0,  0, -5,
+          0,  0,  0,  5,  5,  0,  0,  0
     ],
     chess.QUEEN: [
-        -20, -10, -10, -5, -5, -10, -10, -20,
-        -10, 0, 0, 0, 0, 0, 0, -10,
-        -10, 0, 5, 5, 5, 5, 0, -10,
-        -5, 0, 5, 5, 5, 5, 0, -5,
-        0, 0, 5, 5, 5, 5, 0, -5,
-        -10, 5, 5, 5, 5, 5, 0, -10,
-        -10, 0, 5, 0, 0, 0, 0, -10,
-        -20, -10, -10, -5, -5, -10, -10, -20
+        -20,-10,-10, -5, -5,-10,-10,-20,
+        -10,  0,  0,  0,  0,  0,  0,-10,
+        -10,  0,  5,  5,  5,  5,  0,-10,
+         -5,  0,  5,  5,  5,  5,  0, -5,
+          0,  0,  5,  5,  5,  5,  0, -5,
+        -10,  5,  5,  5,  5,  5,  0,-10,
+        -10,  0,  5,  0,  0,  0,  0,-10,
+        -20,-10,-10, -5, -5,-10,-10,-20
     ],
     chess.KING: [
-        -30, -40, -40, -50, -50, -40, -40, -30,
-        -30, -40, -40, -50, -50, -40, -40, -30,
-        -30, -40, -40, -50, -50, -40, -40, -30,
-        -30, -40, -40, -50, -50, -40, -40, -30,
-        -20, -30, -30, -40, -40, -30, -30, -20,
-        -10, -20, -20, -20, -20, -20, -20, -10,
-        20, 20, 0, 0, 0, 0, 20, 20,
-        20, 30, 10, 0, 0, 10, 30, 20
+        -30,-40,-40,-50,-50,-40,-40,-30,
+        -30,-40,-40,-50,-50,-40,-40,-30,
+        -30,-40,-40,-50,-50,-40,-40,-30,
+        -30,-40,-40,-50,-50,-40,-40,-30,
+        -20,-30,-30,-40,-40,-30,-30,-20,
+        -10,-20,-20,-20,-20,-20,-20,-10,
+         20, 20,  0,  0,  0,  0, 20, 20,
+         20, 30, 10,  0,  0, 10, 30, 20
     ]
 }
 
-def passed_pawn_bonus(board: chess.Board) -> int:
-    # Original function unchanged
-    side = board.turn
-    my_pawns = board.pieces(chess.PAWN, side)
-    opp_pawns = board.pieces(chess.PAWN, not side)
+def passed_pawn_bonus(board: chess.Board, color: chess.Color) -> int:
     bonus = 0
+    my_pawns = board.pieces(chess.PAWN, color)
+    
     for sq in my_pawns:
         f = chess.square_file(sq)
         r = chess.square_rank(sq)
-        blocked = False
-        for df in (-1, 0, 1):
+        
+        passed = True
+        for df in [-1, 0, 1]:
             nf = f + df
-            if not 0 <= nf <= 7:
-                continue
-            if side == chess.WHITE:
-                ahead = (chess.square(nf, nr) for nr in range(r + 1, 8))
-            else:
-                ahead = (chess.square(nf, nr) for nr in range(r - 1, -1, -1))
-            if any(sq2 in opp_pawns for sq2 in ahead):
-                blocked = True
+            if 0 <= nf <= 7:
+                ahead_squares = []
+                if color == chess.WHITE:
+                    for nr in range(r + 1, 8):
+                        ahead_squares.append(chess.square(nf, nr))
+                else: # BLACK
+                    for nr in range(r - 1, -1, -1):
+                        ahead_squares.append(chess.square(nf, nr))
+                
+                for ahead_sq in ahead_squares:
+                    piece = board.piece_at(ahead_sq)
+                    if piece and piece.piece_type == chess.PAWN and piece.color != color:
+                        passed = False
+                        break
+            if not passed:
                 break
-        if blocked:
-            continue
-        rank_from_white = r if side == chess.WHITE else 7 - r
-        bonus += (rank_from_white + 1) * 10
+        
+        if passed:
+            rank_bonus = [0, 10, 20, 30, 50, 75, 100, 0]
+            rank_idx = r if color == chess.WHITE else 7 - r
+            bonus += rank_bonus[rank_idx]
+            
     return bonus
 
-def _adjacent_file_has_pawn(file_idx: int, pawn_bb: chess.SquareSet) -> bool:
-    # Original function unchanged
-    if file_idx > 0 and pawn_bb & chess.BB_FILES[file_idx - 1]:
-        return True
-    if file_idx < 7 and pawn_bb & chess.BB_FILES[file_idx + 1]:
-        return True
-    return False
+def pawn_structure_bonus(board: chess.Board, color: chess.Color) -> int:
+    bonus = 0
+    pawns = board.pieces(chess.PAWN, color)
+    
+    for sq in pawns:
+        f = chess.square_file(sq)
+        
+        # Doubled pawns
+        file_pawns = board.pieces(chess.PAWN, color) & chess.BB_FILES[f]
+        # CORRECTED LINE: Use len() for SquareSet objects
+        if len(file_pawns) > 1:
+            bonus -= 15
+            
+        # Isolated pawns
+        isolated = True
+        for df in [-1, 1]:
+            nf = f + df
+            if 0 <= nf <= 7:
+                if board.pieces(chess.PAWN, color) & chess.BB_FILES[nf]:
+                    isolated = False
+                    break
+        if isolated:
+            bonus -= 20
+            
+    return bonus
 
-def king_safety(board: chess.Board) -> int:
-    # Improved: Added pawn shield bonus
-    if board.fullmove_number < 10:
-        return 0
-    k_sq = board.king(board.turn)
-    if k_sq is None:
-        return 0
-    file = chess.square_file(k_sq)
-    safety = -25 if file in (3, 4) else 0
-    # Pawn shield: bonus for pawns in front of king
-    shield_files = [file-1, file, file+1]
+def king_safety(board: chess.Board, color: chess.Color) -> int:
+    safety = 0
+    king_sq = board.king(color)
+    if king_sq is None: return 0
+    
+    k_file = chess.square_file(king_sq)
     shield_bonus = 0
-    for f in shield_files:
+    for f_offset in [-1, 0, 1]:
+        f = k_file + f_offset
         if 0 <= f <= 7:
-            pawn_mask = chess.BB_FILES[f] & (chess.BB_RANKS[1] if board.turn == chess.WHITE else chess.BB_RANKS[6])
-            if board.pieces(chess.PAWN, board.turn) & pawn_mask:
-                shield_bonus += 10
+            if color == chess.WHITE:
+                if board.piece_at(chess.square(f, 1)) == chess.Piece(chess.PAWN, chess.WHITE):
+                    shield_bonus += 15
+                if board.piece_at(chess.square(f, 2)) == chess.Piece(chess.PAWN, chess.WHITE):
+                    shield_bonus += 10
+            else: # BLACK
+                if board.piece_at(chess.square(f, 6)) == chess.Piece(chess.PAWN, chess.BLACK):
+                    shield_bonus += 15
+                if board.piece_at(chess.square(f, 5)) == chess.Piece(chess.PAWN, chess.BLACK):
+                    shield_bonus += 10
+                    
     safety += shield_bonus
+    
     return safety
 
-def pawn_structure_bonus(board: chess.Board) -> int:
-    # New: Penalties for isolated and doubled pawns
+def mobility_bonus(board: chess.Board, color: chess.Color) -> int:
     bonus = 0
-    for color in [chess.WHITE, chess.BLACK]:
-        pawns = board.pieces(chess.PAWN, color)
-        sign = 1 if color == board.turn else -1
-        for sq in pawns:
-            f = chess.square_file(sq)
-            # Isolated pawn
-            if not _adjacent_file_has_pawn(f, pawns):
-                bonus += sign * -15
-            # Doubled pawn
-            file_pawns = len(pawns & chess.BB_FILES[f])
-            if file_pawns > 1:
-                bonus += sign * -10 * (file_pawns - 1)
+    for piece_type in [chess.KNIGHT, chess.BISHOP, chess.ROOK, chess.QUEEN]:
+        for sq in board.pieces(piece_type, color):
+            bonus += len(board.attacks(sq))
     return bonus
 
-def mobility_bonus(board: chess.Board) -> int:
-    # New: Simple mobility (number of legal moves per piece type)
-    bonus = 0
-    for color in [chess.WHITE, chess.BLACK]:
-        sign = 1 if color == board.turn else -1
-        knights = board.pieces(chess.KNIGHT, color)
-        bishops = board.pieces(chess.BISHOP, color)
-        for sq in knights:
-            attacks = board.attacks(sq)
-            bonus += sign * len(attacks) * 2  # Knights get 2cp per move
-        for sq in bishops:
-            attacks = board.attacks(sq)
-            bonus += sign * len(attacks) * 1.5  # Bishops get 1.5cp per move
-    return int(bonus)
-
 def evaluate(board: chess.Board) -> int:
+    if board.is_checkmate():
+        # The side to move is checkmated
+        return -INF
+    if board.is_stalemate() or board.is_insufficient_material() or board.is_seventyfive_moves() or board.is_fivefold_repetition():
+        return 0
+
     score = 0
+    
+    # Material and PST
     for sq, piece in board.piece_map().items():
         val = VAL[piece.piece_type]
-        pst = PST[piece.piece_type][sq if piece.color else chess.square_mirror(sq)]
-        term = val + pst
-        score += term if piece.color == board.turn else -term
+        # Mirror the square for black's PST lookup
+        pst_sq = sq if piece.color == chess.WHITE else chess.square_mirror(sq)
+        pst_val = PST[piece.piece_type][pst_sq]
+        term = val + pst_val
+        score += term if piece.color == chess.WHITE else -term
+        
+    # Bonuses
+    white_bonus = passed_pawn_bonus(board, chess.WHITE) + \
+                  pawn_structure_bonus(board, chess.WHITE) + \
+                  king_safety(board, chess.WHITE) + \
+                  mobility_bonus(board, chess.WHITE)
+                  
+    black_bonus = passed_pawn_bonus(board, chess.BLACK) + \
+                  pawn_structure_bonus(board, chess.BLACK) + \
+                  king_safety(board, chess.BLACK) + \
+                  mobility_bonus(board, chess.BLACK)
 
-    # Mobility (improved: now includes all pieces roughly)
-    score += 4 * board.legal_moves.count()
-    board.turn = not board.turn
-    score -= 4 * board.legal_moves.count()
-    board.turn = not board.turn
-
-    # Additional bonuses
-    score += passed_pawn_bonus(board)
-    score += king_safety(board)
-    score += pawn_structure_bonus(board)
-    score += mobility_bonus(board)
-
-    return score
+    score += white_bonus - black_bonus
+    
+    # Return score from the perspective of the current player
+    return score if board.turn == chess.WHITE else -score

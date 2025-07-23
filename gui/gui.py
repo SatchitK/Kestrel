@@ -386,6 +386,63 @@ undone_moves = []
 # ─────────────────────────────────────────────────────────────
 #  Rendering helpers
 # ─────────────────────────────────────────────────────────────
+# def draw():
+#     canvas.delete("all")
+
+#     # board squares
+#     for r in range(8):
+#         for c in range(8):
+#             color = LIGHT if (r + c) % 2 == 0 else DARK
+#             x = c * SQ if white_bottom else (7 - c) * SQ
+#             y = r * SQ if white_bottom else (7 - r) * SQ
+#             canvas.create_rectangle(x, y, x + SQ, y + SQ,
+#                                     fill=color, width=0)
+
+#     # last-move highlight
+#     if last_move:
+#         for sq in (last_move.from_square, last_move.to_square):
+#             x, y = sq2xy(sq)
+#             canvas.create_rectangle(x, y, x + SQ, y + SQ,
+#                                     fill="#f6f669", stipple="gray50")
+
+#     # check highlight
+#     if board.is_check():
+#         k_sq = board.king(board.turn)
+#         if k_sq is not None:
+#             x, y = sq2xy(k_sq)
+#             canvas.create_rectangle(x, y, x + SQ, y + SQ,
+#                                     fill="#ff4d4d", stipple="gray50")
+
+#     # pieces
+#     for sq in chess.SQUARES:
+#         piece = board.piece_at(sq)
+#         if piece:
+#             x, y = sq2xy(sq)
+#             key = ('w' if piece.color else 'b') + piece.symbol().upper()
+#             canvas.create_image(x, y, anchor="nw", image=IMG[key],
+#                                 tags=f"sq{sq}")
+
+#     # available-move dots
+#     for sq in avail_sqs:
+#         x, y = sq2xy(sq)
+#         cx, cy = x + SQ // 2, y + SQ // 2
+#         rdot   = SQ // 6
+#         canvas.create_oval(cx - rdot, cy - rdot, cx + rdot, cy + rdot,
+#                            fill="#4da6ff", outline="")
+
+#     update_status()
+
+#     # overlay on checkmate
+#     if board.is_checkmate():
+#         canvas.create_rectangle(0, 0, 8 * SQ, 8 * SQ,
+#                                 fill=OVERLAY_BG, stipple="gray50", width=0)
+#         winner = "White" if board.turn == chess.BLACK else "Black"
+#         canvas.create_text(4 * SQ, 4 * SQ,
+#                            text=f"{winner} wins by CHECKMATE",
+#                            fill=OVERLAY_FG,
+#                            font=("Helvetica", SQ // 4, "bold"),
+#                            anchor="c")
+
 def draw():
     canvas.delete("all")
 
@@ -395,23 +452,20 @@ def draw():
             color = LIGHT if (r + c) % 2 == 0 else DARK
             x = c * SQ if white_bottom else (7 - c) * SQ
             y = r * SQ if white_bottom else (7 - r) * SQ
-            canvas.create_rectangle(x, y, x + SQ, y + SQ,
-                                    fill=color, width=0)
+            canvas.create_rectangle(x, y, x + SQ, y + SQ, fill=color, width=0)
 
     # last-move highlight
     if last_move:
         for sq in (last_move.from_square, last_move.to_square):
             x, y = sq2xy(sq)
-            canvas.create_rectangle(x, y, x + SQ, y + SQ,
-                                    fill="#f6f669", stipple="gray50")
+            canvas.create_rectangle(x, y, x + SQ, y + SQ, fill="#f6f669", stipple="gray50")
 
     # check highlight
     if board.is_check():
         k_sq = board.king(board.turn)
         if k_sq is not None:
             x, y = sq2xy(k_sq)
-            canvas.create_rectangle(x, y, x + SQ, y + SQ,
-                                    fill="#ff4d4d", stipple="gray50")
+            canvas.create_rectangle(x, y, x + SQ, y + SQ, fill="#ff4d4d", stipple="gray50")
 
     # pieces
     for sq in chess.SQUARES:
@@ -419,29 +473,49 @@ def draw():
         if piece:
             x, y = sq2xy(sq)
             key = ('w' if piece.color else 'b') + piece.symbol().upper()
-            canvas.create_image(x, y, anchor="nw", image=IMG[key],
-                                tags=f"sq{sq}")
+            canvas.create_image(x, y, anchor="nw", image=IMG[key], tags=f"sq{sq}")
 
     # available-move dots
     for sq in avail_sqs:
         x, y = sq2xy(sq)
         cx, cy = x + SQ // 2, y + SQ // 2
-        rdot   = SQ // 6
-        canvas.create_oval(cx - rdot, cy - rdot, cx + rdot, cy + rdot,
-                           fill="#4da6ff", outline="")
+        rdot = SQ // 6
+        canvas.create_oval(cx - rdot, cy - rdot, cx + rdot, cy + rdot, fill="#4da6ff", outline="")
 
     update_status()
 
-    # overlay on checkmate
+    # overlay for checkmate
     if board.is_checkmate():
-        canvas.create_rectangle(0, 0, 8 * SQ, 8 * SQ,
-                                fill=OVERLAY_BG, stipple="gray50", width=0)
+        canvas.create_rectangle(0, 0, 8 * SQ, 8 * SQ, fill=OVERLAY_BG, stipple="gray50", width=0)
         winner = "White" if board.turn == chess.BLACK else "Black"
-        canvas.create_text(4 * SQ, 4 * SQ,
-                           text=f"{winner} wins by CHECKMATE",
-                           fill=OVERLAY_FG,
-                           font=("Helvetica", SQ // 4, "bold"),
-                           anchor="c")
+        canvas.create_text(4 * SQ, 4 * SQ, text=f"{winner} wins by CHECKMATE", fill=OVERLAY_FG,
+                           font=("Helvetica", SQ // 4, "bold"), anchor="c")
+
+    # overlay for stalemate
+    elif board.is_stalemate():
+        canvas.create_rectangle(0, 0, 8 * SQ, 8 * SQ, fill=OVERLAY_BG, stipple="gray50", width=0)
+        canvas.create_text(4 * SQ, 4 * SQ, text="Draw by STALEMATE", fill=OVERLAY_FG,
+                           font=("Helvetica", SQ // 4, "bold"), anchor="c")
+
+    # overlay for insufficient material
+    elif board.is_insufficient_material():
+        canvas.create_rectangle(0, 0, 8 * SQ, 8 * SQ, fill=OVERLAY_BG, stipple="gray50", width=0)
+        canvas.create_text(4 * SQ, 4 * SQ, text="Draw by INSUFFICIENT MATERIAL", fill=OVERLAY_FG,
+                           font=("Helvetica", SQ // 4, "bold"), anchor="c")
+
+    # overlay for threefold repetition
+    elif board.can_claim_threefold_repetition():
+        canvas.create_rectangle(0, 0, 8 * SQ, 8 * SQ, fill=OVERLAY_BG, stipple="gray50", width=0)
+        canvas.create_text(4 * SQ, 4 * SQ, text="Draw by THREEFOLD REPETITION", fill=OVERLAY_FG,
+                           font=("Helvetica", SQ // 4, "bold"), anchor="c")
+
+    # overlay for 50-move rule
+    elif board.can_claim_fifty_moves():
+        canvas.create_rectangle(0, 0, 8 * SQ, 8 * SQ, fill=OVERLAY_BG, stipple="gray50", width=0)
+        canvas.create_text(4 * SQ, 4 * SQ, text="Draw by 50-MOVE RULE", fill=OVERLAY_FG,
+                           font=("Helvetica", SQ // 4, "bold"), anchor="c")
+
+
 
 # ─────────────────────────────────────────────────────────────
 #  Promotion dialog

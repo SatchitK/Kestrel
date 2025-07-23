@@ -77,10 +77,76 @@ PST = {
 }
 
 def is_endgame(board: chess.Board) -> bool:
-    """Detect if we're in an endgame phase - FIXED VERSION"""
-    # FIXED: Use len() for SquareSet objects, chess.popcount() for integers
+    """Detect if we're in an endgame phase"""
     piece_count = chess.popcount(board.occupied) - len(board.pieces(chess.PAWN, chess.WHITE)) - len(board.pieces(chess.PAWN, chess.BLACK))
     return piece_count <= 8  # 8 pieces or fewer (excluding pawns)
+
+def center_control_bonus(board: chess.Board, color: chess.Color) -> int:
+    """Reward controlling central squares"""
+    bonus = 0
+    center_squares = [chess.E4, chess.E5, chess.D4, chess.D5]
+    extended_center = [chess.C3, chess.C4, chess.C5, chess.C6,
+                      chess.D3, chess.D6, chess.E3, chess.E6,
+                      chess.F3, chess.F4, chess.F5, chess.F6]
+    
+    for square in center_squares:
+        if board.is_attacked_by(color, square):
+            bonus += 20  # Major center control
+        piece = board.piece_at(square)
+        if piece and piece.color == color:
+            bonus += 30  # Piece occupying center
+    
+    for square in extended_center:
+        if board.is_attacked_by(color, square):
+            bonus += 10  # Extended center control
+    
+    return bonus
+
+def development_bonus(board: chess.Board, color: chess.Color) -> int:
+    """Encourage piece development in opening/middlegame"""
+    if board.fullmove_number > 20:  # Skip in late middlegame/endgame
+        return 0
+    
+    bonus = 0
+    back_rank = 0 if color == chess.WHITE else 7
+    
+    # Penalize pieces still on back rank (except king and rooks for castling)
+    for piece_type in [chess.KNIGHT, chess.BISHOP]:
+        for square in board.pieces(piece_type, color):
+            if chess.square_rank(square) == back_rank:
+                bonus -= 25  # Undeveloped pieces penalty
+            elif piece_type == chess.KNIGHT:
+                # Reward knights on good squares
+                if square in [chess.C3, chess.F3, chess.C6, chess.F6]:
+                    bonus += 15
+    
+    # Encourage early queen development penalty (common mistake)
+    queen_squares = board.pieces(chess.QUEEN, color)
+    if queen_squares and board.fullmove_number <= 10:
+        queen_sq = next(iter(queen_squares))
+        if chess.square_rank(queen_sq) != back_rank:
+            bonus -= 20  # Early queen development penalty
+    
+    return bonus
+
+def piece_coordination_bonus(board: chess.Board, color: chess.Color) -> int:
+    """Reward pieces working together"""
+    bonus = 0
+    
+    # Bishop pair bonus
+    bishops = board.pieces(chess.BISHOP, color)
+    if len(bishops) >= 2:
+        bonus += 30
+    
+    # Rook coordination (same file/rank)
+    rooks = list(board.pieces(chess.ROOK, color))
+    if len(rooks) >= 2:
+        rook1, rook2 = rooks[0], rooks[1]
+        if (chess.square_file(rook1) == chess.square_file(rook2) or 
+            chess.square_rank(rook1) == chess.square_rank(rook2)):
+            bonus += 20
+    
+    return bonus
 
 def endgame_progress_bonus(board: chess.Board, color: chess.Color) -> int:
     """Reward progress in winning endgames"""
@@ -127,6 +193,21 @@ def fifty_move_penalty(board: chess.Board) -> int:
         # Heavy penalty as we approach 50 moves without progress
         return (board.halfmove_clock - 40) * 20
     return 0
+
+def detect_undefended_pieces(board: chess.Board, color: chess.Color) -> int:
+    """CONSERVATIVE threat detection - only major undefended pieces"""
+    penalty = 0
+    
+    # Only check valuable pieces (not pawns)
+    for piece_type in [chess.QUEEN, chess.ROOK]:
+        for square in board.pieces(piece_type, color):
+            if board.is_attacked_by(not color, square):
+                defenders = board.attackers(color, square)
+                if not defenders:
+                    # VERY small penalty - don't panic
+                    penalty += VAL[piece_type] // 10  # Queen = 90, Rook = 50
+    
+    return penalty
 
 def passed_pawn_bonus(board: chess.Board, color: chess.Color) -> int:
     bonus = 0
@@ -220,14 +301,27 @@ def king_safety(board: chess.Board, color: chess.Color) -> int:
     safety += shield_bonus
     return safety
 
-def mobility_bonus(board: chess.Board, color: chess.Color) -> int:
+def improved_mobility_bonus(board: chess.Board, color: chess.Color) -> int:
+    """Better mobility calculation that considers square quality"""
     bonus = 0
+    center_squares = {chess.E4, chess.E5, chess.D4, chess.D5}
+    
     for piece_type in [chess.KNIGHT, chess.BISHOP, chess.ROOK, chess.QUEEN]:
         for sq in board.pieces(piece_type, color):
-            mobility = len(board.attacks(sq))
-            # INCREASED mobility bonus in endgame
-            multiplier = 2 if is_endgame(board) else 1
-            bonus += mobility * multiplier
+            moves = board.attacks(sq)
+            
+            # Basic mobility
+            mobility = len(moves)
+            bonus += mobility * 2
+            
+            # Extra bonus for controlling center
+            center_control = len(moves & center_squares)
+            bonus += center_control * 5
+            
+            # Penalty for pieces with very limited mobility
+            if mobility <= 2 and piece_type in [chess.ROOK, chess.QUEEN]:
+                bonus -= 15
+    
     return bonus
 
 def evaluate(board: chess.Board) -> int:
@@ -252,20 +346,31 @@ def evaluate(board: chess.Board) -> int:
         term = val + pst_val
         score += term if piece.color == chess.WHITE else -term
     
-    # Bonuses
-    white_bonus = passed_pawn_bonus(board, chess.WHITE) + \
-                  pawn_structure_bonus(board, chess.WHITE) + \
-                  king_safety(board, chess.WHITE) + \
-                  mobility_bonus(board, chess.WHITE) + \
-                  endgame_progress_bonus(board, chess.WHITE)
+    # Enhanced bonuses for better middlegame play
+    white_bonus = (passed_pawn_bonus(board, chess.WHITE) + 
+                   pawn_structure_bonus(board, chess.WHITE) + 
+                   king_safety(board, chess.WHITE) + 
+                   improved_mobility_bonus(board, chess.WHITE) +
+                   center_control_bonus(board, chess.WHITE) +
+                   development_bonus(board, chess.WHITE) +
+                   piece_coordination_bonus(board, chess.WHITE) +
+                   endgame_progress_bonus(board, chess.WHITE))
     
-    black_bonus = passed_pawn_bonus(board, chess.BLACK) + \
-                  pawn_structure_bonus(board, chess.BLACK) + \
-                  king_safety(board, chess.BLACK) + \
-                  mobility_bonus(board, chess.BLACK) + \
-                  endgame_progress_bonus(board, chess.BLACK)
+    black_bonus = (passed_pawn_bonus(board, chess.BLACK) + 
+                   pawn_structure_bonus(board, chess.BLACK) + 
+                   king_safety(board, chess.BLACK) + 
+                   improved_mobility_bonus(board, chess.BLACK) +
+                   center_control_bonus(board, chess.BLACK) +
+                   development_bonus(board, chess.BLACK) +
+                   piece_coordination_bonus(board, chess.BLACK) +
+                   endgame_progress_bonus(board, chess.BLACK))
     
     score += white_bonus - black_bonus
+    
+    # CONSERVATIVE threat detection - very small penalty
+    white_threats = detect_undefended_pieces(board, chess.WHITE)
+    black_threats = detect_undefended_pieces(board, chess.BLACK)
+    score -= (white_threats - black_threats)
     
     # Apply 50-move penalty to the winning side
     if score > 100:  # White is winning

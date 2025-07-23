@@ -9,6 +9,27 @@ MAX_PLY = 64
 KILLERS = [[None, None] for _ in range(MAX_PLY)]
 HISTORY = {}
 
+def is_obvious_blunder(board: chess.Board, move: chess.Move) -> bool:
+    """Detect obvious material-losing blunders"""
+    if not board.is_capture(move):
+        # Check if move hangs a valuable piece
+        board.push(move)
+        
+        # Check if the piece we just moved is now undefended and attacked
+        to_square = move.to_square
+        piece = board.piece_at(to_square)
+        
+        if piece and piece.piece_type in [chess.QUEEN, chess.ROOK]:
+            if board.is_attacked_by(not board.turn, to_square):
+                defenders = board.attackers(board.turn, to_square)
+                if not defenders:  # Undefended valuable piece
+                    board.pop()
+                    return True
+        
+        board.pop()
+    
+    return False
+
 def find_best_move(board: chess.Board, time_limit: float):
     best_move = None
     depth = 1
@@ -24,6 +45,7 @@ def find_best_move(board: chess.Board, time_limit: float):
             current_score, move, searched_nodes = alphabeta(board, depth, alpha, beta, 0, t_start, time_limit)
             nodes += searched_nodes
             
+            # If search fails high or low, re-search with a full window
             if current_score <= alpha or current_score >= beta:
                 alpha, beta = -INF, INF
                 current_score, move, searched_nodes = alphabeta(board, depth, alpha, beta, 0, t_start, time_limit)
@@ -43,6 +65,7 @@ def find_best_move(board: chess.Board, time_limit: float):
         
         depth += 1
         
+        # Stop if time is almost up to avoid starting a long search
         if elapsed_time > time_limit * 0.7 or depth > MAX_PLY:
             return best_move
 
@@ -128,33 +151,75 @@ def quiescence(board, alpha, beta, ply):
     nodes = 1
     stand_pat = evaluate(board)
     
-    if stand_pat >= beta: return beta, nodes
-    if alpha < stand_pat: alpha = stand_pat
+    if stand_pat >= beta: 
+        return beta, nodes
+    if alpha < stand_pat: 
+        alpha = stand_pat
     
-    captures = sorted([m for m in board.legal_moves if board.is_capture(m)], key=lambda m: see(board, m), reverse=True)
+    # Generate captures AND checks (checks can reveal tactics)
+    moves = []
+    for move in board.legal_moves:
+        if board.is_capture(move):
+            moves.append(move)
+        elif board.gives_check(move):
+            moves.append(move)
     
-    for move in captures:
-        if see(board, move) < 0: continue
-        
+    # Sort moves by expected value
+    moves.sort(key=lambda m: see(board, m) if board.is_capture(m) else 100, reverse=True)
+    
+    for move in moves:
+        # Only consider good captures or checks
+        if board.is_capture(move) and see(board, move) < -100:
+            continue
+            
         board.push(move)
         score, s_nodes = quiescence(board, -beta, -alpha, ply + 1)
         nodes += s_nodes
         score = -score
         board.pop()
         
-        if score >= beta: return beta, nodes
-        if score > alpha: alpha = score
+        if score >= beta: 
+            return beta, nodes
+        if score > alpha: 
+            alpha = score
     
     return alpha, nodes
 
 def move_score(board, move, ply, tt_move):
-    if move == tt_move: return 20000
-    if board.is_capture(move): return 10000 + see(board, move)
+    if move == tt_move: 
+        return 20000
     
-    # NEW: Bonus for pawn moves in endgames (progress!)
+    if board.is_capture(move): 
+        return 10000 + see(board, move)
+    
+    # NEW: Heavily penalize obvious blunders
+    if is_obvious_blunder(board, move):
+        return -50000  # Make it very unlikely to be chosen
+    
+    # NEW: Positional move bonuses
     piece = board.piece_at(move.from_square)
-    if piece and piece.piece_type == chess.PAWN:
-        return 1000  # Encourage pawn progress
+    if piece:
+        # Development moves in opening
+        if board.fullmove_number <= 15:
+            from_rank = chess.square_rank(move.from_square)
+            to_rank = chess.square_rank(move.to_square)
+            back_rank = 0 if piece.color == chess.WHITE else 7
+            
+            # Reward developing pieces from back rank
+            if from_rank == back_rank and to_rank != back_rank:
+                if piece.piece_type in [chess.KNIGHT, chess.BISHOP]:
+                    return 5000  # High priority for development
+        
+        # Center control moves
+        center_squares = {chess.E4, chess.E5, chess.D4, chess.D5}
+        if move.to_square in center_squares:
+            return 3000  # Encourage center occupation
+        
+        # Pawn advances (structure building and progress)
+        if piece.piece_type == chess.PAWN:
+            return 1000  # Moderate priority for pawn moves
     
-    if move in KILLERS[ply]: return 9000
+    if move in KILLERS[ply]: 
+        return 9000
+    
     return HISTORY.get(move, 0)

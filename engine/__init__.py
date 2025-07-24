@@ -6,7 +6,7 @@ import chess # Added for board handling
 
 BOOK = Book("engine/komodo.bin")
 
-def best_move(board: chess.Board, time_limit: float = 10.0): # <-- CHANGED
+def best_move(board: chess.Board, time_limit: float = 20.0): # <-- CHANGED
     """
     Finds the best move for a given board position.
     The default time_limit has been increased to 10 seconds.

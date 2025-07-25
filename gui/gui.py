@@ -573,7 +573,7 @@ def make_ai_move():
     engine_thinking = True
 
     def worker():
-        mv = engine.best_move(position, time_limit=10.0)
+        mv = engine.best_move(position, time_limit=20.0)
 
         def apply():
             nonlocal mv
